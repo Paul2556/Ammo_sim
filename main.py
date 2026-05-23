@@ -16,7 +16,7 @@ class Projectile:
 
 class Wall:
 
-    def __init__(self, x1, y1, x2, y2, durability, strength, color, Ricochet_Chance, Ricochet_Treshold=30, Ricochet_Loss=0.5, Ricochet_Loss_Variation=0.1):
+    def __init__(self, x1, y1, x2, y2, durability, strength, color, Ricochet_Chance, Ricochet_Treshold=30, Ricochet_Loss=0.5, Ricochet_Loss_Variation=0.1, Detected=False):
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
@@ -28,6 +28,7 @@ class Wall:
         self.Ricochet_Treshold = Ricochet_Treshold
         self.Ricochet_Loss = Ricochet_Loss
         self.Ricochet_Loss_Variation = Ricochet_Loss_Variation
+        self.detected = Detected
 
 class Game(arcade.Window):
 
@@ -59,8 +60,10 @@ class Game(arcade.Window):
         if key == arcade.key.SPACE:
             self.projectiles.append(Projectile(100, 100, 200, 150))
         if key == arcade.key.R:
-            self.projectiles = [Projectile(100, 100, 200, 150),Projectile(0, 100, 200, 150)]
-            self.walls = [Wall(500, 500, 600, 600, 200, 100, arcade.color.WHITE, 0.5)]
+            self.mouse_x = 0
+            self.mouse_y = 0
+            self.projectiles = []
+            self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 0.5)]
         if key == arcade.key.H:
             self.projectiles.append(Projectile(self.mouse_x, self.mouse_y, 200, 150, arcade.color.PURPLE, projectile_type="heat_seeking_missile"))
 
@@ -68,6 +71,10 @@ class Game(arcade.Window):
         self.clear()
 
         for wall in self.walls:
+            if wall.detected:
+                wall.color = arcade.color.GREEN
+            else:
+                wall.color = arcade.color.WHITE
             arcade.draw_lbwh_rectangle_filled(
                 wall.x1,
                 wall.y1,
@@ -108,8 +115,25 @@ class Game(arcade.Window):
                 projectile.x + projectile.vx * 0.1,
                 projectile.y + projectile.vy * 0.1,
                 arcade.color.GREEN,
-            2
-)
+                2
+            )
+            if projectile.projectile_type == "heat_seeking_missile":
+                arcade.draw_line(
+                    projectile.x,
+                    projectile.y,
+                    projectile.x + 1000 * np.cos(projectile.angle + 5 * np.pi / 180),
+                    projectile.y + 1000 * np.sin(projectile.angle + 5 * np.pi / 180),
+                    arcade.color.GREEN,
+                    2
+                )
+                arcade.draw_line(
+                    projectile.x,
+                    projectile.y,
+                    projectile.x + 1000 * np.cos(projectile.angle - 5 * np.pi / 180),
+                    projectile.y + 1000 * np.sin(projectile.angle - 5 * np.pi / 180),
+                    arcade.color.GREEN,
+                    2
+                )
 
     def on_update(self, delta_time):
         for projectile in self.projectiles:
@@ -144,6 +168,10 @@ class Game(arcade.Window):
                         projectile.angle = np.arctan2(wall.y1 + (wall.y2 - wall.y1) / 2 - projectile.y, wall.x1 + (wall.x2 - wall.x1) / 2 - projectile.x)
                         projectile.vx = 200 * np.cos(projectile.angle)
                         projectile.vy = 200 * np.sin(projectile.angle)
+                        wall.detected = True
+                    else:
+                        wall.detected = False
+                        print("test")
                 if (wall.x1 <= projectile.x <= wall.x2) and (wall.y1 <= projectile.y <= wall.y2):
                     mx = np.sqrt(projectile.vx**2 + projectile.vy**2)
                     wall.durability -= .1*mx*delta_time
