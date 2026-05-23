@@ -37,7 +37,7 @@ class Game(arcade.Window):
         self.mouse_x = 0
         self.mouse_y = 0
         self.projectiles = []
-        self.walls = [Wall(600, 1000, 1200, 1200, 200, 100, arcade.color.WHITE, 0.5)]
+        self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 0.5)]
 
     def on_mouse_motion(self, x, y, dx, dy):
         self.mouse_x = x
@@ -66,6 +66,8 @@ class Game(arcade.Window):
             self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 0.5)]
         if key == arcade.key.H:
             self.projectiles.append(Projectile(self.mouse_x, self.mouse_y, 200, 150, arcade.color.PURPLE, projectile_type="heat_seeking_missile"))
+        if key == arcade.key.W:
+            self.walls.append(Wall(self.mouse_x, self.mouse_y, self.mouse_x + 100, self.mouse_y + 100, 200, 100, arcade.color.WHITE, 0.5))
 
     def on_draw(self):
         self.clear()
@@ -171,7 +173,6 @@ class Game(arcade.Window):
                         wall.detected = True
                     else:
                         wall.detected = False
-                        print("test")
                 if (wall.x1 <= projectile.x <= wall.x2) and (wall.y1 <= projectile.y <= wall.y2):
                     mx = np.sqrt(projectile.vx**2 + projectile.vy**2)
                     wall.durability -= .1*mx*delta_time
