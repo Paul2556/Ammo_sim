@@ -2,13 +2,13 @@ import arcade, numpy as np
 
 
 # Constants
-average_bullet_speed = 500 #default 500
-average_rocket_speed = 300 #default 300
-gravity = 9.81 #default 9.81
+average_bullet_speed = 1000 #default 1000
+average_rocket_speed = 800 #default 800
+gravity = 100 #default 9.81
 heat_visibility_multiplier = 1 #default 2.55, higher values make heat more visible but also make it more opaque, lower values make it less visible but also more transparent
 angle_update_interval = 10 #default 10, higher values make the trail update less frequently but also make it less accurate, lower values make the trail update more frequently but also make it more accurate
 fade_rate = 5 #default 5, higher values make the trail fade faster but also make it more transparent, lower values make the trail fade slower but also make it more visible
-trail_length = 100 #default 100, higher values make the trail longer but also make it more performance intensive, lower values make the trail shorter but also make it less visible 
+trail_length = 300 #default 100, higher values make the trail longer but also make it more performance intensive, lower values make the trail shorter but also make it less visible 
 air_density = .001 #default 0.001, higher values make the projectiles slow down faster but also make them more affected by drag, lower values make the projectiles slow down slower but also make them less affected by drag
 class Projectile:
 
@@ -28,6 +28,7 @@ class Projectile:
         self.thrust = thrust
         self.trail = [(x, y, self.angle, 255)]
         self.lazy = lazy
+        self.trail_length = trail_length
     
 
 class Wall:
@@ -88,7 +89,15 @@ class Game(arcade.Window):
             self.mouse_y = 0
             self.projectiles = []
             self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 1,heat=1)]
-        self.projectile_spawner(key, arcade.key.H, modifiers, color=arcade.color.PURPLE, turn_rate=1.5, projectile_type="heat_seeking_missile", heat=100, detection_cone_angle=45, detection_range=300,thrust=40)
+        self.projectile_spawner(key, arcade.key.H, modifiers, 
+                                color=arcade.color.PURPLE, 
+                                turn_rate=1.5, 
+                                projectile_type="heat_seeking_missile", 
+                                heat=100, 
+                                detection_cone_angle=180, 
+                                detection_range=300,
+                                thrust=40
+                            )
         if key == arcade.key.W and not modifiers & arcade.key.MOD_SHIFT:
             print("point a set")
             global pointax, pointay
@@ -104,7 +113,12 @@ class Game(arcade.Window):
                 if pointby < pointay:
                     pointay, pointby = pointby, pointay
                     swapped_y = True
-            self.walls.append(Wall(pointax, pointay, pointbx, pointby, 200, 100, arcade.color.WHITE, 0,heat=1))
+            self.walls.append(Wall(pointax, pointay, pointbx, pointby, 
+                                   durability=200, 
+                                   strength=100, 
+                                   color=arcade.color.WHITE, 
+                                   Ricochet_Chance=0,
+                                   heat=1))
             if swapped_x:
                 pointax, pointbx = pointbx, pointax
                 swapped_x = False
@@ -148,22 +162,12 @@ class Game(arcade.Window):
 
         for projectile in self.projectiles:
             if projectile.heat > 0:
-                if projectile.projectile_type == "flare":
-                    arcade.draw_circle_filled(
-                        projectile.x,
-                        projectile.y,
-                        projectile.heat*heat_visibility_multiplier,
-                        (255, 255, 0, int(projectile.heat * (heat_visibility_multiplier/3)))
-                    )
-                else:
-                    arcade.draw_line(
-                        projectile.x,
-                        projectile.y,
-                        projectile.x + projectile.heat*heat_visibility_multiplier * np.cos(projectile.angle),
-                        projectile.y + projectile.heat*heat_visibility_multiplier * np.sin(projectile.angle),
-                        (255, 255, 0, int(projectile.heat * (heat_visibility_multiplier/3))),
-                        2
-                    )
+                arcade.draw_circle_filled(
+                    projectile.x,
+                    projectile.y,
+                    projectile.heat*heat_visibility_multiplier,
+                    (255, 255, 0, int(projectile.heat * (heat_visibility_multiplier/3)))
+                )
             # Draw the trail
             for i in range(1, len(projectile.trail)):
                 if projectile.trail[i-1][3] < 0:
@@ -174,7 +178,16 @@ class Game(arcade.Window):
                     projectile.trail[i][1],
                     (projectile.color[0], projectile.color[1], projectile.color[2], 0),
                     2
-                    )                
+                    )   
+                elif projectile.projectile_type == "flare":     
+                    arcade.draw_line(
+                        projectile.trail[i-1][0],
+                        projectile.trail[i-1][1],
+                        projectile.trail[i][0],
+                        projectile.trail[i][1],
+                        (projectile.color[0], projectile.color[1], projectile.color[2], projectile.heat * heat_visibility_multiplier),
+                        2
+                    )        
                 else:
                     arcade.draw_line(
                         projectile.trail[i-1][0],
@@ -189,7 +202,7 @@ class Game(arcade.Window):
                 projectile.y,
                 5,
                 projectile.color
-            )
+            ) 
             arcade.draw_line(
                 projectile.x,
                 projectile.y,
@@ -225,11 +238,15 @@ class Game(arcade.Window):
                 projectile.angle = np.arctan2(projectile.vy, projectile.vx)
                 projectile.trail.append((projectile.x, projectile.y, projectile.angle, 255))
             projectile.trail.append((projectile.x, projectile.y, projectile.angle, 255))
-            if len(projectile.trail) > trail_length:
-                for i in range(len(projectile.trail) - trail_length):
-                    projectile.trail[i] = (projectile.trail[i][0], projectile.trail[i][1], projectile.trail[i][2], projectile.trail[i][3] - fade_rate)
-            if projectile.trail[0][3] <= 0:
-                projectile.trail.pop(0)
+            if projectile.projectile_type != "flare":
+                if projectile.lazy and projectile.trail_length != 50:
+                    projectile.trail_length = 50
+                    print("ts")
+                if len(projectile.trail) > projectile.trail_length:
+                    for i in range(len(projectile.trail) - projectile.trail_length):
+                        projectile.trail[i] = (projectile.trail[i][0], projectile.trail[i][1], projectile.trail[i][2], projectile.trail[i][3] - (fade_rate * delta_time*100))
+                if projectile.trail[0][3] <= 0:
+                    projectile.trail.pop(0)
             if projectile.alive == False:
                 self.projectiles.remove(projectile)
                 continue
@@ -238,7 +255,7 @@ class Game(arcade.Window):
                     projectile.lazy = True
                     # print("lazy ahh")
                     continue
-            if projectile.x < 0-trail_length-average_bullet_speed or projectile.x > self.width+trail_length+average_bullet_speed or projectile.y < 0-trail_length-average_bullet_speed or projectile.y > self.height+trail_length+average_bullet_speed:
+            if projectile.x < 0-(2*projectile.trail_length+average_bullet_speed) or projectile.x > self.width+(2*projectile.trail_length+average_bullet_speed) or projectile.y < 0-(2*projectile.trail_length+average_bullet_speed) or projectile.y > self.height+(2*projectile.trail_length+average_bullet_speed):
                 projectile.alive = False
                 print("ammo destroyed")
                 continue
@@ -249,6 +266,11 @@ class Game(arcade.Window):
                     projectile.alive = False
                     print("flare expired")
                     continue
+                if len(projectile.trail) > 5:
+                    for i in range(len(projectile.trail) - 3):
+                        projectile.trail[i] = (projectile.trail[i][0], projectile.trail[i][1], projectile.trail[i][2], projectile.trail[i][3] * .2 - .01)
+                if projectile.trail[0][3] <= 0:
+                    projectile.trail.pop(0)
             projectile.vx += projectile.thrust * np.cos(projectile.angle) * delta_time
             projectile.vy += projectile.thrust * np.sin(projectile.angle) * delta_time
             projectile.x += projectile.vx * delta_time
@@ -259,110 +281,110 @@ class Game(arcade.Window):
                 projectile.vx -= drag * projectile.vx * delta_time
                 projectile.vy -= drag * projectile.vy * delta_time
 
-            for wall in self.walls:
-                if projectile.projectile_type == "heat_seeking_missile":
-                    projectile.angle = np.arctan2(projectile.vy, projectile.vx)
-                    target_found = False
-                    target_x = 0
-                    target_y = 0
+                for wall in self.walls:
+                    if projectile.projectile_type == "heat_seeking_missile":
+                        projectile.angle = np.arctan2(projectile.vy, projectile.vx)
+                        target_found = False
+                        target_x = 0
+                        target_y = 0
 
-                    for wall in self.walls:
-                        wall_center_x = wall.x1 + (wall.x2 - wall.x1) / 2
-                        wall_center_y = wall.y1 + (wall.y2 - wall.y1) / 2
-                        if abs( wall_center_x -projectile.x) < projectile.detection_range and abs(wall_center_y - projectile.y) < projectile.detection_range:
-                            wall_Tleft_corner_angle = np.arctan2(
-                                wall.y1 - projectile.y,
-                                wall.x1 - projectile.x
+                        for wall in self.walls:
+                            wall_center_x = wall.x1 + (wall.x2 - wall.x1) / 2
+                            wall_center_y = wall.y1 + (wall.y2 - wall.y1) / 2
+                            if abs( wall_center_x -projectile.x) < projectile.detection_range and abs(wall_center_y - projectile.y) < projectile.detection_range:
+                                wall_Tleft_corner_angle = np.arctan2(
+                                    wall.y1 - projectile.y,
+                                    wall.x1 - projectile.x
+                                )
+                                wall_Tright_corner_angle = np.arctan2(
+                                    wall.y1 - projectile.y,
+                                    wall.x2 - projectile.x
+                                )
+                                wall_Bleft_corner_angle = np.arctan2(
+                                    wall.y2 - projectile.y,
+                                    wall.x1 - projectile.x
+                                )
+                                wall_Bright_corner_angle = np.arctan2(
+                                    wall.y2 - projectile.y,
+                                    wall.x2 - projectile.x
+                                )
+                                if (
+                                    abs(np.arctan2(np.sin(projectile.angle - wall_Tleft_corner_angle), np.cos(projectile.angle - wall_Tleft_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
+                                    abs(np.arctan2(np.sin(projectile.angle - wall_Tright_corner_angle), np.cos(projectile.angle - wall_Tright_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
+                                    abs(np.arctan2(np.sin(projectile.angle - wall_Bleft_corner_angle), np.cos(projectile.angle - wall_Bleft_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
+                                    abs(np.arctan2(np.sin(projectile.angle - wall_Bright_corner_angle), np.cos(projectile.angle - wall_Bright_corner_angle))) < projectile.detection_cone_angle * np.pi / 180
+                                ):
+                                    if np.sqrt(
+                                        (wall_center_x - projectile.x) ** 2 +
+                                        (wall_center_y - projectile.y) ** 2
+                                    ) < projectile.detection_range:
+                                        target_found = True
+                                        target_x = wall_center_x
+                                        target_y = wall_center_y
+                                        break
+                        if target_found:
+                            projectile.angle = np.arctan2(
+                                target_y - projectile.y,
+                                target_x - projectile.x
                             )
-                            wall_Tright_corner_angle = np.arctan2(
-                                wall.y1 - projectile.y,
-                                wall.x2 - projectile.x
-                            )
-                            wall_Bleft_corner_angle = np.arctan2(
-                                wall.y2 - projectile.y,
-                                wall.x1 - projectile.x
-                            )
-                            wall_Bright_corner_angle = np.arctan2(
-                                wall.y2 - projectile.y,
-                                wall.x2 - projectile.x
-                            )
-                            if (
-                                abs(np.arctan2(np.sin(projectile.angle - wall_Tleft_corner_angle), np.cos(projectile.angle - wall_Tleft_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
-                                abs(np.arctan2(np.sin(projectile.angle - wall_Tright_corner_angle), np.cos(projectile.angle - wall_Tright_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
-                                abs(np.arctan2(np.sin(projectile.angle - wall_Bleft_corner_angle), np.cos(projectile.angle - wall_Bleft_corner_angle))) < projectile.detection_cone_angle * np.pi / 180 or
-                                abs(np.arctan2(np.sin(projectile.angle - wall_Bright_corner_angle), np.cos(projectile.angle - wall_Bright_corner_angle))) < projectile.detection_cone_angle * np.pi / 180
-                            ):
-                                if np.sqrt(
-                                    (wall_center_x - projectile.x) ** 2 +
-                                    (wall_center_y - projectile.y) ** 2
-                                ) < projectile.detection_range:
-                                    target_found = True
-                                    target_x = wall_center_x
-                                    target_y = wall_center_y
-                                    break
-                    if target_found:
-                        projectile.angle = np.arctan2(
-                            target_y - projectile.y,
-                            target_x - projectile.x
-                        )
-                        speed = np.sqrt(projectile.vx**2 + projectile.vy**2)
-                        target_vx = speed * np.cos(projectile.angle)
-                        target_vy = speed * np.sin(projectile.angle)
-                        projectile.vx += (target_vx - projectile.vx) * projectile.turn_rate * delta_time
-                        projectile.vy += (target_vy - projectile.vy) * projectile.turn_rate * delta_time
-                if (
-                        wall.x1 <= projectile.x <= wall.x2
-                        and
-                        wall.y1 <= projectile.y <= wall.y2
-                ):
-                    mx = np.sqrt(projectile.vx**2 + projectile.vy**2)
-                    wall.durability -= .1 * mx * delta_time
-                    if wall.durability <= 0:
-                        self.walls.remove(wall)
-                        print("wall destroyed")
-                        break
-                    else: #$ RECCOCHET
-                        if np.random.random() < wall.Ricochet_Chance:
-                            projectile.color = arcade.color.YELLOW
-                            if projectile.x - wall.x1 < .3 * (wall.x2 - wall.x1):
-                                projectile.vx = -projectile.vx * (
-                                    wall.Ricochet_Loss +
-                                    np.random.uniform(
-                                        -wall.Ricochet_Loss_Variation,
-                                        wall.Ricochet_Loss_Variation
+                            speed = np.sqrt(projectile.vx**2 + projectile.vy**2)
+                            target_vx = speed * np.cos(projectile.angle)
+                            target_vy = speed * np.sin(projectile.angle)
+                            projectile.vx += (target_vx - projectile.vx) * projectile.turn_rate * delta_time
+                            projectile.vy += (target_vy - projectile.vy) * projectile.turn_rate * delta_time
+                    if (
+                            wall.x1 <= projectile.x <= wall.x2
+                            and
+                            wall.y1 <= projectile.y <= wall.y2
+                    ):
+                        mx = np.sqrt(projectile.vx**2 + projectile.vy**2)
+                        wall.durability -= .1 * mx * delta_time
+                        if wall.durability <= 0:
+                            self.walls.remove(wall)
+                            print("wall destroyed")
+                            break
+                        else: #$ RECCOCHET
+                            if np.random.random() < wall.Ricochet_Chance:
+                                projectile.color = arcade.color.YELLOW
+                                if projectile.x - wall.x1 < .3 * (wall.x2 - wall.x1):
+                                    projectile.vx = -projectile.vx * (
+                                        wall.Ricochet_Loss +
+                                        np.random.uniform(
+                                            -wall.Ricochet_Loss_Variation,
+                                            wall.Ricochet_Loss_Variation
+                                        )
                                     )
-                                )
-                                projectile.angle = np.arctan2(
-                                    projectile.vy,
-                                    projectile.vx
-                                )
-                                if wall.x2 - projectile.x < .3 * (wall.x2 - wall.x1):
-                                    projectile.x = wall.x2 + 1
-                                else:
-                                    projectile.x = wall.x1 - 1
-                            elif projectile.y - wall.y1 < .3 * (wall.y2 - wall.y1):
-                                projectile.vy = -projectile.vy * (
-                                    wall.Ricochet_Loss +
-                                    np.random.uniform(
-                                        -wall.Ricochet_Loss_Variation,
-                                        wall.Ricochet_Loss_Variation
+                                    projectile.angle = np.arctan2(
+                                        projectile.vy,
+                                        projectile.vx
                                     )
-                                )
-                                projectile.angle = np.arctan2(
-                                    projectile.vy,
-                                    projectile.vx
-                                )
-                                if wall.y2 - projectile.y < .3 * (wall.y2 - wall.y1):
-                                    projectile.y = wall.y2 + 1
-                                else:
-                                    projectile.y = wall.y1 - 1
-                            print("ammo rico")
-                        else:
+                                    if wall.x2 - projectile.x < .3 * (wall.x2 - wall.x1):
+                                        projectile.x = wall.x2 + 1
+                                    else:
+                                        projectile.x = wall.x1 - 1
+                                elif projectile.y - wall.y1 < .3 * (wall.y2 - wall.y1):
+                                    projectile.vy = -projectile.vy * (
+                                        wall.Ricochet_Loss +
+                                        np.random.uniform(
+                                            -wall.Ricochet_Loss_Variation,
+                                            wall.Ricochet_Loss_Variation
+                                        )
+                                    )
+                                    projectile.angle = np.arctan2(
+                                        projectile.vy,
+                                        projectile.vx
+                                    )
+                                    if wall.y2 - projectile.y < .3 * (wall.y2 - wall.y1):
+                                        projectile.y = wall.y2 + 1
+                                    else:
+                                        projectile.y = wall.y1 - 1
+                                print("ammo rico")
+                            else:
+                                projectile.alive = False
+                        if mx < wall.strength:
                             projectile.alive = False
-                    if mx < wall.strength:
-                        projectile.alive = False
+                            break
                         break
-                    break
 
 game = Game()
 arcade.run()
