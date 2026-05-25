@@ -1,14 +1,19 @@
-import arcade, numpy as np
+"""
+Projectile Simulation
+This code simulates the behavior of projectiles (bullets, rockets, heat-seeking missiles, and flares) in a 2D environment with walls. The projectiles are affected by gravity, drag, and can interact with walls by either damaging them or ricocheting off of them. The simulation also includes a visual representation of the projectiles and their trails, as well as the walls and their durability.
+This goes by 10 pixels per meter, so a projectile with a speed of 1000 pixels per second is equivalent to a speed of 100 meters per second in real life. The simulation also includes a heat mechanic, where projectiles and walls can emit heat that can be detected by heat-seeking missiles. The heat is visualized as a yellow circle around the projectile or wall, with the intensity of the color representing the amount of heat. The simulation can be paused and reset using the spacebar and R key, respectively. The user can also spawn different types of projectiles using the mouse buttons and the H and F keys.
+"""
 
+import arcade, numpy as np
 
 # Constants
 average_bullet_speed = 1000 #default 1000
 average_rocket_speed = 800 #default 800
-gravity = 100 #default 9.81
+gravity = 9.81 #default 9.81
 heat_visibility_multiplier = 1 #default 2.55, higher values make heat more visible but also make it more opaque, lower values make it less visible but also more transparent
 angle_update_interval = 10 #default 10, higher values make the trail update less frequently but also make it less accurate, lower values make the trail update more frequently but also make it more accurate
 fade_rate = 5 #default 5, higher values make the trail fade faster but also make it more transparent, lower values make the trail fade slower but also make it more visible
-trail_length = 300 #default 100, higher values make the trail longer but also make it more performance intensive, lower values make the trail shorter but also make it less visible 
+trail_length = 100 #default 100, higher values make the trail longer but also make it more performance intensive, lower values make the trail shorter but also make it less visible 
 air_density = .001 #default 0.001, higher values make the projectiles slow down faster but also make them more affected by drag, lower values make the projectiles slow down slower but also make them less affected by drag
 class Projectile:
 
@@ -55,7 +60,7 @@ class Game(arcade.Window):
         self.mouse_x = 0
         self.mouse_y = 0
         self.projectiles = []
-        self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 1,heat=1)]
+        self.walls = [Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
         self.paused = False
     
     def projectile_spawner(self, key, hotkey, modifiers, color=arcade.color.RED, turn_rate=0.1, projectile_type="bullet", thrust=0, detection_range=0, detection_cone_angle=0, heat=0):
@@ -88,13 +93,13 @@ class Game(arcade.Window):
             self.mouse_x = 0
             self.mouse_y = 0
             self.projectiles = []
-            self.walls = [Wall(600, 600, 700, 700, 200, 100, arcade.color.WHITE, 1,heat=1)]
+            self.walls = [Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
         self.projectile_spawner(key, arcade.key.H, modifiers, 
                                 color=arcade.color.PURPLE, 
-                                turn_rate=1.5, 
+                                turn_rate=1, 
                                 projectile_type="heat_seeking_missile", 
                                 heat=100, 
-                                detection_cone_angle=180, 
+                                detection_cone_angle=45, 
                                 detection_range=300,
                                 thrust=40
                             )
@@ -114,18 +119,24 @@ class Game(arcade.Window):
                     pointay, pointby = pointby, pointay
                     swapped_y = True
             self.walls.append(Wall(pointax, pointay, pointbx, pointby, 
-                                   durability=200, 
-                                   strength=100, 
-                                   color=arcade.color.WHITE, 
-                                   Ricochet_Chance=0,
-                                   heat=1))
+                                durability=200, 
+                                strength=100, 
+                                color=arcade.color.WHITE, 
+                                Ricochet_Chance=0,
+                                heat=1
+                            )
+                        )
             if swapped_x:
                 pointax, pointbx = pointbx, pointax
                 swapped_x = False
             if swapped_y:
                 pointay, pointby = pointby, pointay
                 swapped_y = False
-        self.projectile_spawner(key, arcade.key.F, modifiers, color=arcade.color.YELLOW, projectile_type="flare", heat=100)
+        self.projectile_spawner(key, arcade.key.F, modifiers, 
+                                color=arcade.color.YELLOW, 
+                                projectile_type="flare", 
+                                heat=100
+                            )
 
     #$ END OF SPAWNING STUFF
     def on_draw(self):
@@ -241,7 +252,7 @@ class Game(arcade.Window):
             if projectile.projectile_type != "flare":
                 if projectile.lazy and projectile.trail_length != 50:
                     projectile.trail_length = 50
-                    print("ts")
+                    # print("ts")
                 if len(projectile.trail) > projectile.trail_length:
                     for i in range(len(projectile.trail) - projectile.trail_length):
                         projectile.trail[i] = (projectile.trail[i][0], projectile.trail[i][1], projectile.trail[i][2], projectile.trail[i][3] - (fade_rate * delta_time*100))
