@@ -14,3 +14,12 @@ class Wall:
         self.Ricochet_Loss_Variation = Ricochet_Loss_Variation
         self.detected = Detected
         self.heat = heat
+        self.midpoints = self.get_midpoints()
+    
+    def get_midpoints(self):
+        return [
+            (((self.x1 + self.x2) / 2), self.y1), #bottom 
+            (self.x1, ((self.y1 + self.y2) / 2)), #left
+            (((self.x1 + self.x2) / 2), self.y2), #top
+            (self.x2, ((self.y1 + self.y2) / 2)), #right
+        ]

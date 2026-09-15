@@ -21,7 +21,7 @@ bullet_x = 0
 bullet_y = 0
 
 class Game(arcade.Window):
-
+    
     def __init__(self):
         super().__init__(1280, 720, "Kill Tofu Simulator")
         self.mouse_x = 0
@@ -78,29 +78,11 @@ class Game(arcade.Window):
             pointax,pointay = self.mouse_x, self.mouse_y
         if key == arcade.key.W and modifiers & arcade.key.MOD_SHIFT:
             print("point b set")
-            global pointbx, pointby, swapped_x, swapped_y
-            pointbx,pointby = self.mouse_x, self.mouse_y
-            if pointbx < pointax or pointby < pointay:
-                if pointbx < pointax:
-                    pointax, pointbx = pointbx, pointax
-                    swapped_x = True
-                if pointby < pointay:
-                    pointay, pointby = pointby, pointay
-                    swapped_y = True
-            self.walls.append(wall.Wall(pointax, pointay, pointbx, pointby, 
-                                durability=200, 
-                                strength=100, 
-                                color=arcade.color.WHITE, 
-                                Ricochet_Chance=0,
-                                heat=1
-                            )
-                        )
-            if swapped_x:
-                pointax, pointbx = pointbx, pointax
-                swapped_x = False
-            if swapped_y:
-                pointay, pointby = pointby, pointay
-                swapped_y = False
+            global pointbx, pointby
+            pointbx, pointby = self.mouse_x, self.mouse_y
+            pointax, pointbx = min(pointax, pointbx), max(pointax, pointbx)
+            pointay, pointby = min(pointay, pointby), max(pointay, pointby)
+            self.walls.append(wall.Wall(pointax, pointay, pointbx, pointby, 200, 100, arcade.color.WHITE, 1))
         self.projectile_spawner(key, arcade.key.F, modifiers, 
                                 color=arcade.color.YELLOW, 
                                 projectile_type="flare", 
@@ -117,17 +99,12 @@ class Game(arcade.Window):
                     (255, 255, 255)
                 )
         for w in self.walls:
-            if w.heat > 0:
-                arcade.draw_circle_filled(
-                    w.x1 + (w.x2 - w.x1) / 2,
-                    w.y1 + (w.y2 - w.y1) / 2,
-                    w.heat*heat_visibility_multiplier,
-                    (255, 255, 0, int(w.heat * (heat_visibility_multiplier/3)))
-                )
             if w.detected:
                 w.color = arcade.color.GREEN
             else:
                 w.color = arcade.color.WHITE
+            for i in w.midpoints:
+                arcade.draw_circle_filled(i[0], i[1], 4, arcade.color.RED)
             arcade.draw_lbwh_rectangle_filled(
                 w.x1,
                 w.y1,
@@ -135,6 +112,13 @@ class Game(arcade.Window):
                 w.y2 - w.y1,
                 w.color
             )
+            if w.heat > 0:
+                arcade.draw_circle_filled(
+                    w.x1 + (w.x2 - w.x1) / 2,
+                    w.y1 + (w.y2 - w.y1) / 2,
+                    w.heat*heat_visibility_multiplier,
+                    (255, 255, 0, int(w.heat * (heat_visibility_multiplier/3)))
+                )
             arcade.draw_text(
                         f"{int(w.durability)}",
                         w.x1 + (w.x2 - w.x1) / 2,
@@ -144,6 +128,8 @@ class Game(arcade.Window):
                         anchor_x="center",
                         anchor_y="center"
             )
+            arcade.draw_circle_filled(w.x1, w.y1, 5, arcade.color.AFRICAN_VIOLET)
+            arcade.draw_circle_filled(w.x2, w.y2, 5, arcade.color.AIR_FORCE_BLUE)
 
         for proj in self.projectiles:
             if proj.heat > 0:
@@ -242,7 +228,7 @@ class Game(arcade.Window):
                     continue
             if proj.x < 0-(2*proj.trail_length+average_bullet_speed) or proj.x > self.width+(2*proj.trail_length+average_bullet_speed) or proj.y < 0-(2*proj.trail_length+average_bullet_speed) or proj.y > self.height+(2*proj.trail_length+average_bullet_speed):
                 proj.alive = False
-                print("ammo destroyed")
+                # print("ammo destroyed")
                 continue
             if proj.projectile_type == "flare":
                 proj.color = (proj.color[0], proj.color[1], proj.color[2], int(proj.heat * 2.55))
@@ -267,56 +253,7 @@ class Game(arcade.Window):
                 proj.vy -= drag * proj.vy * delta_time
 
                 for w in self.walls:
-                    if proj.projectile_type == "heat_seeking_missile":
-                        proj.angle = np.arctan2(proj.vy, proj.vx)
-                        target_found = False
-                        target_x = 0
-                        target_y = 0
-
-                        for w in self.walls:
-                            wall_center_x = w.x1 + (w.x2 - w.x1) / 2
-                            wall_center_y = w.y1 + (w.y2 - w.y1) / 2
-                            if abs( wall_center_x -proj.x) < proj.detection_range and abs(wall_center_y - proj.y) < proj.detection_range:
-                                wall_Tleft_corner_angle = np.arctan2(
-                                    w.y1 - proj.y,
-                                    w.x1 - proj.x
-                                )
-                                wall_Tright_corner_angle = np.arctan2(
-                                    w.y1 - proj.y,
-                                    w.x2 - proj.x
-                                )
-                                wall_Bleft_corner_angle = np.arctan2(
-                                    w.y2 - proj.y,
-                                    w.x1 - proj.x
-                                )
-                                wall_Bright_corner_angle = np.arctan2(
-                                    w.y2 - proj.y,
-                                    w.x2 - proj.x
-                                )
-                                if (
-                                    abs(np.arctan2(np.sin(proj.angle - wall_Tleft_corner_angle), np.cos(proj.angle - wall_Tleft_corner_angle))) < proj.detection_cone_angle * np.pi / 180 or
-                                    abs(np.arctan2(np.sin(proj.angle - wall_Tright_corner_angle), np.cos(proj.angle - wall_Tright_corner_angle))) < proj.detection_cone_angle * np.pi / 180 or
-                                    abs(np.arctan2(np.sin(proj.angle - wall_Bleft_corner_angle), np.cos(proj.angle - wall_Bleft_corner_angle))) < proj.detection_cone_angle * np.pi / 180 or
-                                    abs(np.arctan2(np.sin(proj.angle - wall_Bright_corner_angle), np.cos(proj.angle - wall_Bright_corner_angle))) < proj.detection_cone_angle * np.pi / 180
-                                ):
-                                    if np.sqrt(
-                                        (wall_center_x - proj.x) ** 2 +
-                                        (wall_center_y - proj.y) ** 2
-                                    ) < proj.detection_range:
-                                        target_found = True
-                                        target_x = wall_center_x
-                                        target_y = wall_center_y
-                                        break
-                        if target_found:
-                            proj.angle = np.arctan2(
-                                target_y - proj.y,
-                                target_x - proj.x
-                            )
-                            speed = np.sqrt(proj.vx**2 + proj.vy**2)
-                            target_vx = speed * np.cos(proj.angle)
-                            target_vy = speed * np.sin(proj.angle)
-                            proj.vx += (target_vx - proj.vx) * proj.turn_rate * delta_time
-                            proj.vy += (target_vy - proj.vy) * proj.turn_rate * delta_time
+                    proj.targeting(self.walls)
                     if (
                             w.x1 <= proj.x <= w.x2
                             and
@@ -332,39 +269,18 @@ class Game(arcade.Window):
                             if np.random.random() < w.Ricochet_Chance:
                                 #TODO: Have to redo this whole thing
                                 proj.color = arcade.color.YELLOW
-                                if proj.x - w.x1 < .2 * (w.x2 - w.x1):
-                                    proj.vx = -proj.vx * (
-                                        w.Ricochet_Loss +
-                                        np.random.uniform(
-                                            -w.Ricochet_Loss_Variation,
-                                            w.Ricochet_Loss_Variation
-                                        )
-                                    )
-                                    proj.angle = np.arctan2(
-                                        proj.vy,
-                                        proj.vx
-                                    )
-                                    if w.x2 - proj.x < .2 * (w.x2 - w.x1):
-                                        proj.x = w.x2 + 1
-                                    else:
-                                        proj.x = w.x1 - 1
-                                elif proj.y - w.y1 < .2 * (w.y2 - w.y1):
-                                    proj.vy = -proj.vy * (
-                                        w.Ricochet_Loss +
-                                        np.random.uniform(
-                                            -w.Ricochet_Loss_Variation,
-                                            w.Ricochet_Loss_Variation
-                                        )
-                                    )
-                                    proj.angle = np.arctan2(
-                                        proj.vy,
-                                        proj.vx
-                                    )
-                                    if w.y2 - proj.y < .2 * (w.y2 - w.y1):
-                                        proj.y = w.y2 + 1
-                                    else:
-                                        proj.y = w.y1 - 1
-                                print("ammo rico")
+                                if proj.side == -1:
+                                    distance_to_midpoint = []
+                                    for i in w.midpoints:
+                                        distance_to_midpoint.append(np.sqrt((proj.x-i[0])**2 + (proj.y-i[1])**2))
+                                    shortest_distance = distance_to_midpoint.index(min(distance_to_midpoint))
+                                    proj.side = shortest_distance
+                                    if shortest_distance == 0 or shortest_distance == 2:
+                                        print("bottom")
+                                        proj.vy = -proj.vy
+                                    elif shortest_distance == 1 or shortest_distance == 3:
+                                        print("left")
+                                        proj.vx = -proj.vx
                             else:
                                 proj.alive = False
                         if mx < w.strength:
