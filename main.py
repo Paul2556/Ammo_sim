@@ -3,50 +3,57 @@ Projectile Simulation
 This code simulates the behavior of projectiles (bullets, rockets, heat-seeking missiles, and flares) in a 2D environment with walls. The projectiles are affected by gravity, drag, and can interact with walls by either damaging them or ricocheting off of them. The simulation also includes a visual representation of the projectiles and their trails, as well as the walls and their durability.
 This goes by 10 pixels per meter, so a projectile with a speed of 1000 pixels per second is equivalent to a speed of 100 meters per second in real life. The simulation also includes a heat mechanic, where projectiles and walls can emit heat that can be detected by heat-seeking missiles. The heat is visualized as a yellow circle around the projectile or wall, with the intensity of the color representing the amount of heat. The simulation can be paused and reset using the spacebar and R key, respectively. The user can also spawn different types of projectiles using the mouse buttons and the H and F keys.
 """
-import config
-import arcade, numpy as np
-import projectile, wall
 
-# Constants
-average_bullet_speed = 1000 #default 1000
-average_rocket_speed = 800 #default 800
-gravity = 9.81 #default 9.81
-heat_visibility_multiplier = 1 #default 2.55, higher values make heat more visible but also make it more opaque, lower values make it less visible but also more transparent
-angle_update_interval = 10 #default 10, higher values make the trail update less frequently but also make it less accurate, lower values make the trail update more frequently but also make it more accurate
-fade_rate = 5 #default 5, higher values make the trail fade faster but also make it more transparent, lower values make the trail fade slower but also make it more visible
-trail_length = 100 #default 100, higher values make the trail longer but also make it more performance intensive, lower values make the trail shorter but also make it less visible 
-air_density = .001 #default 0.001, higher values make the projectiles slow down faster but also make them more affected by drag, lower values make the projectiles slow down slower but also make them less affected by drag
+from config import *
+import projectile
+import wall
+import arcade, numpy as np
+from time import sleep
+from arcade.clock import GLOBAL_CLOCK
+
 
 bullet_x = 0
 bullet_y = 0
 
-class Game(arcade.Window):
+def clamp_alpha(a):
+    return max(0, min(255, int(a)))
     
+class Game(arcade.Window):
     def __init__(self):
         super().__init__(1280, 720, "Kill Tofu Simulator")
+        self.held_keys = set()
         self.mouse_x = 0
         self.mouse_y = 0
         self.projectiles = []
         self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
         self.paused = False
-    
-    def projectile_spawner(self, key, hotkey, modifiers, color=arcade.color.RED, turn_rate=0.1, projectile_type="bullet", thrust=0, detection_range=0, detection_cone_angle=0, heat=0):
-        if key == hotkey and not modifiers & arcade.key.MOD_SHIFT:
-            global bullet_x, bullet_y
+
+    def shift_held(self):
+        return arcade.key.LSHIFT in self.held_keys or arcade.key.RSHIFT in self.held_keys
+
+    def projectile_spawner(self, hotkey, delta_time, color=arcade.color.RED, turn_rate=0.1, projectile_type="bullet", thrust=0, detection_range=0, detection_cone_angle=0, heat=0, fire_rate=0.1):
+        if hotkey not in self.held_keys:
+            return
+        global bullet_x, bullet_y
+        if self.shift_held():
+            if GLOBAL_CLOCK.time % fire_rate < delta_time:
+                self.projectiles.append(projectile.Projectile(bullet_x, bullet_y, average_bullet_speed* np.cos(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), average_bullet_speed * np.sin(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), color=color, turn_rate=turn_rate, projectile_type=projectile_type, heat=heat, thrust=thrust, detection_cone_angle=detection_cone_angle, detection_range=detection_range))
+        else:
             bullet_x = self.mouse_x
             bullet_y = self.mouse_y
-        if key == hotkey and modifiers & arcade.key.MOD_SHIFT:
-            self.projectiles.append(projectile.Projectile(bullet_x, bullet_y, average_bullet_speed* np.cos(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), average_bullet_speed * np.sin(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), color=color, turn_rate=turn_rate, projectile_type=projectile_type, heat=heat, thrust=thrust, detection_cone_angle=detection_cone_angle, detection_range=detection_range))
-    
+
     def on_mouse_motion(self, x, y, dx, dy):
         self.mouse_x = x
         self.mouse_y = y
+
     #$ START OF SPAWNING STUFF
     def on_mouse_press(self, x, y, button, modifiers):
         self.mouse_x = x
         self.mouse_y = y
-        self.projectile_spawner(button, arcade.MOUSE_BUTTON_LEFT, modifiers, color=arcade.color.RED, projectile_type="bullet", heat=50)
-        self.projectile_spawner(button, arcade.MOUSE_BUTTON_RIGHT, modifiers, color=arcade.color.ORANGE, projectile_type="rocket", thrust=10, heat=100)
+        self.held_keys.add(button)
+
+    def on_mouse_release(self, x, y, button, modifiers):
+        self.held_keys.discard(button)
         if button == arcade.MOUSE_BUTTON_MIDDLE:
             for proj in self.projectiles:
                 proj.angle = np.arctan2(self.mouse_y - proj.y, self.mouse_x - proj.x)
@@ -54,6 +61,7 @@ class Game(arcade.Window):
                 proj.vy = 200 * np.sin(proj.angle)
 
     def on_key_press(self, key, modifiers):
+        self.held_keys.add(key)
         if key == arcade.key.SPACE:
             self.paused = not self.paused
         if key == arcade.key.R:
@@ -61,17 +69,6 @@ class Game(arcade.Window):
             self.mouse_y = 0
             self.projectiles = []
             self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
-        self.projectile_spawner(key, arcade.key.B, modifiers, color=arcade.color.RED, projectile_type="bullet", heat=50)
-        self.projectile_spawner(key, arcade.key.O, modifiers, color=arcade.color.ORANGE, projectile_type="rocket", thrust=10, heat=100)
-        self.projectile_spawner(key, arcade.key.H, modifiers, 
-                                color=arcade.color.PURPLE, 
-                                turn_rate=1, 
-                                projectile_type="heat_seeking_missile", 
-                                heat=100, 
-                                detection_cone_angle=45, 
-                                detection_range=300,
-                                thrust=40
-                            )
         if key == arcade.key.W and not modifiers & arcade.key.MOD_SHIFT:
             print("point a set")
             global pointax, pointay
@@ -83,11 +80,9 @@ class Game(arcade.Window):
             pointax, pointbx = min(pointax, pointbx), max(pointax, pointbx)
             pointay, pointby = min(pointay, pointby), max(pointay, pointby)
             self.walls.append(wall.Wall(pointax, pointay, pointbx, pointby, 200, 100, arcade.color.WHITE, 1))
-        self.projectile_spawner(key, arcade.key.F, modifiers, 
-                                color=arcade.color.YELLOW, 
-                                projectile_type="flare", 
-                                heat=100
-                            )
+
+    def on_key_release(self, key, modifiers):
+        self.held_keys.discard(key)
 
     #$ END OF SPAWNING STUFF
     def on_draw(self):
@@ -117,7 +112,7 @@ class Game(arcade.Window):
                     w.x1 + (w.x2 - w.x1) / 2,
                     w.y1 + (w.y2 - w.y1) / 2,
                     w.heat*heat_visibility_multiplier,
-                    (255, 255, 0, int(w.heat * (heat_visibility_multiplier/3)))
+                    (255, 255, 0, clamp_alpha(int(w.heat * (heat_visibility_multiplier/3))))
                 )
             arcade.draw_text(
                         f"{int(w.durability)}",
@@ -137,7 +132,7 @@ class Game(arcade.Window):
                     proj.x,
                     proj.y,
                     proj.heat*heat_visibility_multiplier,
-                    (255, 255, 0, int(proj.heat * (heat_visibility_multiplier/3)))
+                    (255, 255, 0, clamp_alpha(int(proj.heat * (heat_visibility_multiplier/3))))
                 )
             # Draw the trail
             for i in range(1, len(proj.trail)):
@@ -172,7 +167,7 @@ class Game(arcade.Window):
                 proj.x,
                 proj.y,
                 5,
-                proj.color
+                (proj.color[0], proj.color[1], proj.color[2], clamp_alpha(proj.color[3]))
             ) 
             arcade.draw_line(
                 proj.x,
@@ -201,6 +196,13 @@ class Game(arcade.Window):
                 )
 
     def on_update(self, delta_time):
+        self.projectile_spawner(arcade.key.B, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50)
+        self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=45, heat=120)
+        self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=10, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=360, detection_range=300, thrust=40)
+        self.projectile_spawner(arcade.key.F, delta_time, color=arcade.color.YELLOW, projectile_type="flare", heat=255)
+        self.projectile_spawner(arcade.MOUSE_BUTTON_LEFT, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50)
+        self.projectile_spawner(arcade.MOUSE_BUTTON_RIGHT, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=10, heat=100)
+
         if self.paused:
             return
         for proj in self.projectiles:
@@ -251,9 +253,8 @@ class Game(arcade.Window):
                 proj.vy -= gravity * delta_time
                 proj.vx -= drag * proj.vx * delta_time
                 proj.vy -= drag * proj.vy * delta_time
-
+                proj.targeting(self.walls, self.projectiles, delta_time)
                 for w in self.walls:
-                    proj.targeting(self.walls)
                     if (
                             w.x1 <= proj.x <= w.x2
                             and
@@ -277,10 +278,10 @@ class Game(arcade.Window):
                                     proj.side = shortest_distance
                                     if shortest_distance == 0 or shortest_distance == 2:
                                         print("bottom")
-                                        proj.vy = -proj.vy
+                                        proj.vy = -proj.vy + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
                                     elif shortest_distance == 1 or shortest_distance == 3:
                                         print("left")
-                                        proj.vx = -proj.vx
+                                        proj.vx = -proj.vx + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
                             else:
                                 proj.alive = False
                         if mx < w.strength:

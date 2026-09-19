@@ -1,5 +1,4 @@
 import arcade, config, numpy as np
-from main import delta_time
 
 class Projectile:
 
@@ -22,7 +21,7 @@ class Projectile:
         self.trail_length = config.trail_length
         self.side = -1
 
-    def targeting(self, walls):
+    def targeting(self, walls, projectiles, delta_time):
         if self.projectile_type == "heat_seeking_missile":
             self.angle = np.arctan2(self.vy, self.vx)
             target_found = False
@@ -32,7 +31,7 @@ class Projectile:
             for w in walls:
                 wall_center_x = w.x1 + (w.x2 - w.x1) / 2
                 wall_center_y = w.y1 + (w.y2 - w.y1) / 2
-                if abs( wall_center_x -self.x) < self.detection_range and abs(wall_center_y - self.y) < self.detection_range:
+                if abs( wall_center_x -self.x) < self.detection_range and abs(wall_center_y - self.y) < self.detection_range and w.heat != 0:
                     wall_Tleft_corner_angle = np.arctan2(
                         w.y1 - self.y,
                         w.x1 - self.x
@@ -63,6 +62,21 @@ class Projectile:
                             target_x = wall_center_x
                             target_y = wall_center_y
                             break
+
+            if not target_found:
+                for p in projectiles:
+                    if p is self or p.heat == 0:
+                        continue
+                    if abs(p.x - self.x) < self.detection_range and abs(p.y - self.y) < self.detection_range:
+                        angle_to_p = np.arctan2(p.y - self.y, p.x - self.x)
+                        angle_diff = abs(np.arctan2(np.sin(self.angle - angle_to_p), np.cos(self.angle - angle_to_p)))
+                        if angle_diff < self.detection_cone_angle * np.pi / 180:
+                            if np.sqrt((p.x - self.x) ** 2 + (p.y - self.y) ** 2) < self.detection_range:
+                                target_found = True
+                                target_x = p.x
+                                target_y = p.y
+                                break
+            
             if target_found:
                 self.angle = np.arctan2(
                     target_y - self.y,
