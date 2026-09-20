@@ -201,8 +201,8 @@ class Game(arcade.Window):
 
     def on_update(self, delta_time):
         self.projectile_spawner(arcade.key.B, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50, automatic=False)
-        self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=200, heat=120)
-        self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=1, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=180, detection_range=300, thrust=100)
+        self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=45, heat=120)
+        self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=5, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=80, detection_range=300, thrust=100)
         self.projectile_spawner(arcade.key.F, delta_time, color=arcade.color.YELLOW, projectile_type="flare", heat=255)
         self.projectile_spawner(arcade.MOUSE_BUTTON_LEFT, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50)
         self.projectile_spawner(arcade.MOUSE_BUTTON_RIGHT, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=10, heat=100)
