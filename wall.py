@@ -16,6 +16,7 @@ class Wall:
         self.detected = Detected
         self.heat = heat
         self.midpoints = self.get_midpoints()
+        self.center = ((x1 + x2)/2, (y1 + y2)/2)
     
     def get_midpoints(self):
         return [

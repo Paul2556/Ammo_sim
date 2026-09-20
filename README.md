@@ -1,4 +1,4 @@
-![Projectile Sim](image.png)
+![Projectile Sim](media/image.png)
 
 # Projectile Sim
 A little project that I made for fun.

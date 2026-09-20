@@ -25,19 +25,27 @@ class Game(arcade.Window):
         self.mouse_x = 0
         self.mouse_y = 0
         self.projectiles = []
-        self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
+        self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=30)]
         self.paused = False
-
+    
+    def reset(self):
+        self.mouse_x = 0
+        self.mouse_y = 0
+        self.projectiles = []
+        self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=30)]
     def shift_held(self):
         return arcade.key.LSHIFT in self.held_keys or arcade.key.RSHIFT in self.held_keys
 
-    def projectile_spawner(self, hotkey, delta_time, color=arcade.color.RED, turn_rate=0.1, projectile_type="bullet", thrust=0, detection_range=0, detection_cone_angle=0, heat=0, fire_rate=0.1):
+    def projectile_spawner(self, hotkey, delta_time, color=arcade.color.RED, turn_rate=0.1, projectile_type="bullet", thrust=0, detection_range=0, detection_cone_angle=0, heat=0, fire_rate=0.1, automatic=True):
         if hotkey not in self.held_keys:
             return
         global bullet_x, bullet_y
-        if self.shift_held():
+        if self.shift_held() and automatic:
             if GLOBAL_CLOCK.time % fire_rate < delta_time:
                 self.projectiles.append(projectile.Projectile(bullet_x, bullet_y, average_bullet_speed* np.cos(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), average_bullet_speed * np.sin(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), color=color, turn_rate=turn_rate, projectile_type=projectile_type, heat=heat, thrust=thrust, detection_cone_angle=detection_cone_angle, detection_range=detection_range))
+        elif not automatic:
+            self.projectiles.append(projectile.Projectile(bullet_x, bullet_y, average_bullet_speed* np.cos(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), average_bullet_speed * np.sin(np.arctan2(self.mouse_y - bullet_y, self.mouse_x - bullet_x)), color=color, turn_rate=turn_rate, projectile_type=projectile_type, heat=heat, thrust=thrust, detection_cone_angle=detection_cone_angle, detection_range=detection_range))
+            self.held_keys.remove(hotkey)
         else:
             bullet_x = self.mouse_x
             bullet_y = self.mouse_y
@@ -65,10 +73,7 @@ class Game(arcade.Window):
         if key == arcade.key.SPACE:
             self.paused = not self.paused
         if key == arcade.key.R:
-            self.mouse_x = 0
-            self.mouse_y = 0
-            self.projectiles = []
-            self.walls = [wall.Wall(self.width//2-50, self.height//2-50, self.width//2+50, self.height//2+50, 200, 100, arcade.color.WHITE, 1,heat=1)]
+            self.reset()
         if key == arcade.key.W and not modifiers & arcade.key.MOD_SHIFT:
             print("point a set")
             global pointax, pointay
@@ -94,6 +99,13 @@ class Game(arcade.Window):
                     (255, 255, 255)
                 )
         for w in self.walls:
+            if w.heat > 0:
+                arcade.draw_circle_filled(
+                    w.center[0],
+                    w.center[1],
+                    w.heat*heat_visibility_multiplier,
+                    (255, 255, 0, clamp_alpha(int(w.heat * (heat_visibility_multiplier/3))))
+                )
             if w.detected:
                 w.color = arcade.color.GREEN
             else:
@@ -107,13 +119,6 @@ class Game(arcade.Window):
                 w.y2 - w.y1,
                 w.color
             )
-            if w.heat > 0:
-                arcade.draw_circle_filled(
-                    w.x1 + (w.x2 - w.x1) / 2,
-                    w.y1 + (w.y2 - w.y1) / 2,
-                    w.heat*heat_visibility_multiplier,
-                    (255, 255, 0, clamp_alpha(int(w.heat * (heat_visibility_multiplier/3))))
-                )
             arcade.draw_text(
                         f"{int(w.durability)}",
                         w.x1 + (w.x2 - w.x1) / 2,
@@ -151,7 +156,7 @@ class Game(arcade.Window):
                         proj.trail[i-1][1],
                         proj.trail[i][0],
                         proj.trail[i][1],
-                        (proj.color[0], proj.color[1], proj.color[2], proj.heat * heat_visibility_multiplier),
+                        (proj.color[0], proj.color[1], proj.color[2], clamp_alpha(proj.heat * heat_visibility_multiplier)),
                         2
                     )        
                 else:
@@ -196,7 +201,7 @@ class Game(arcade.Window):
                 )
 
     def on_update(self, delta_time):
-        self.projectile_spawner(arcade.key.B, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50)
+        self.projectile_spawner(arcade.key.B, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50, automatic=False)
         self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=45, heat=120)
         self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=10, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=360, detection_range=300, thrust=40)
         self.projectile_spawner(arcade.key.F, delta_time, color=arcade.color.YELLOW, projectile_type="flare", heat=255)
@@ -248,46 +253,45 @@ class Game(arcade.Window):
             proj.vy += proj.thrust * np.sin(proj.angle) * delta_time
             proj.x += proj.vx * delta_time
             proj.y += proj.vy * delta_time
-            if not proj.lazy:
-                drag = air_density * np.sqrt(proj.vx**2 + proj.vy**2)
-                proj.vy -= gravity * delta_time
-                proj.vx -= drag * proj.vx * delta_time
-                proj.vy -= drag * proj.vy * delta_time
-                proj.targeting(self.walls, self.projectiles, delta_time)
-                for w in self.walls:
-                    if (
-                            w.x1 <= proj.x <= w.x2
-                            and
-                            w.y1 <= proj.y <= w.y2
-                    ):
-                        mx = np.sqrt(proj.vx**2 + proj.vy**2)
-                        w.durability -= .1 * mx * delta_time
-                        if w.durability <= 0:
-                            self.walls.remove(w)
-                            print("wall destroyed")
-                            break
-                        else: #$ RECCOCHET
-                            if np.random.random() < w.Ricochet_Chance:
-                                #TODO: Have to redo this whole thing
-                                proj.color = arcade.color.YELLOW
-                                if proj.side == -1:
-                                    distance_to_midpoint = []
-                                    for i in w.midpoints:
-                                        distance_to_midpoint.append(np.sqrt((proj.x-i[0])**2 + (proj.y-i[1])**2))
-                                    shortest_distance = distance_to_midpoint.index(min(distance_to_midpoint))
-                                    proj.side = shortest_distance
-                                    if shortest_distance == 0 or shortest_distance == 2:
-                                        print("bottom")
-                                        proj.vy = -proj.vy + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
-                                    elif shortest_distance == 1 or shortest_distance == 3:
-                                        print("left")
-                                        proj.vx = -proj.vx + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
-                            else:
-                                proj.alive = False
-                        if mx < w.strength:
-                            proj.alive = False
-                            break
+            if proj.lazy:
+                continue
+            drag = air_density * np.sqrt(proj.vx**2 + proj.vy**2)
+            proj.vy -= gravity * delta_time
+            proj.vx -= drag * proj.vx * delta_time
+            proj.vy -= drag * proj.vy * delta_time
+            proj.targeting(self.walls, self.projectiles, delta_time)
+            for w in self.walls:
+                if (
+                        w.x1 <= proj.x <= w.x2
+                        and
+                        w.y1 <= proj.y <= w.y2
+                ):
+                    mx = np.sqrt(proj.vx**2 + proj.vy**2)
+                    w.durability -= .1 * mx * delta_time
+                    if w.durability <= 0:
+                        self.walls.remove(w)
+                        print("wall destroyed")
                         break
+                    else: #$ RECCOCHET
+                        if np.random.random() < w.Ricochet_Chance:
+                            #TODO: Have to redo this whole thing
+                            proj.color = arcade.color.YELLOW
+                            if proj.side == -1:
+                                distance_to_midpoint = []
+                                for i in w.midpoints:
+                                    distance_to_midpoint.append(np.sqrt((proj.x-i[0])**2 + (proj.y-i[1])**2))
+                                shortest_distance = distance_to_midpoint.index(min(distance_to_midpoint))
+                                proj.side = shortest_distance
+                                if shortest_distance == 0 or shortest_distance == 2:
+                                    proj.vy = -proj.vy + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
+                                elif shortest_distance == 1 or shortest_distance == 3:
+                                    proj.vx = -proj.vx + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
+                        else:
+                            proj.alive = False
+                    if mx < w.strength:
+                        proj.alive = False
+                        break
+                    break
 
 game = Game()
 arcade.run()
