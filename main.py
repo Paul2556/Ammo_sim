@@ -289,9 +289,9 @@ class Game(arcade.Window):
                                 proj.side = -1
                         else:
                             proj.alive = False
-                    # if mx < w.strength:
-                    #     proj.alive = False
-                    #     break
+                    if mx < w.strength:
+                        proj.alive = False
+                        break
                     break
 
 game = Game()
