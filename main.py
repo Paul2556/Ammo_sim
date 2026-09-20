@@ -1,10 +1,7 @@
-"""
-Projectile Simulation
-This code simulates the behavior of projectiles (bullets, rockets, heat-seeking missiles, and flares) in a 2D environment with walls. The projectiles are affected by gravity, drag, and can interact with walls by either damaging them or ricocheting off of them. The simulation also includes a visual representation of the projectiles and their trails, as well as the walls and their durability.
-This goes by 10 pixels per meter, so a projectile with a speed of 1000 pixels per second is equivalent to a speed of 100 meters per second in real life. The simulation also includes a heat mechanic, where projectiles and walls can emit heat that can be detected by heat-seeking missiles. The heat is visualized as a yellow circle around the projectile or wall, with the intensity of the color representing the amount of heat. The simulation can be paused and reset using the spacebar and R key, respectively. The user can also spawn different types of projectiles using the mouse buttons and the H and F keys.
-"""
-
-from config import *
+try:
+    from config import *
+except ModuleNotFoundError:
+    from example_config import *
 import projectile
 import wall
 import arcade, numpy as np
@@ -20,7 +17,7 @@ def clamp_alpha(a):
     
 class Game(arcade.Window):
     def __init__(self):
-        super().__init__(1280, 720, "Kill Tofu Simulator")
+        super().__init__(1280, 720, "Projectile Sim")
         self.held_keys = set()
         self.mouse_x = 0
         self.mouse_y = 0
@@ -174,6 +171,8 @@ class Game(arcade.Window):
                 5,
                 (proj.color[0], proj.color[1], proj.color[2], clamp_alpha(proj.color[3]))
             ) 
+            if not show_debug:
+                continue
             arcade.draw_line(
                 proj.x,
                 proj.y,
@@ -202,8 +201,8 @@ class Game(arcade.Window):
 
     def on_update(self, delta_time):
         self.projectile_spawner(arcade.key.B, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50, automatic=False)
-        self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=45, heat=120)
-        self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=10, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=360, detection_range=300, thrust=40)
+        self.projectile_spawner(arcade.key.O, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=200, heat=120)
+        self.projectile_spawner(arcade.key.H, delta_time, color=arcade.color.PURPLE, turn_rate=1, projectile_type="heat_seeking_missile", heat=120, detection_cone_angle=180, detection_range=300, thrust=100)
         self.projectile_spawner(arcade.key.F, delta_time, color=arcade.color.YELLOW, projectile_type="flare", heat=255)
         self.projectile_spawner(arcade.MOUSE_BUTTON_LEFT, delta_time, color=arcade.color.RED, projectile_type="bullet", heat=50)
         self.projectile_spawner(arcade.MOUSE_BUTTON_RIGHT, delta_time, color=arcade.color.ORANGE, projectile_type="rocket", thrust=10, heat=100)
@@ -211,6 +210,9 @@ class Game(arcade.Window):
         if self.paused:
             return
         for proj in self.projectiles:
+            if proj.alive == False:
+                self.projectiles.remove(proj)
+                continue
             # print(len(proj.trail), proj.trail[0][3])
             if np.abs(proj.trail[-1][2] - proj.angle) > 0.1 or np.mod(len(proj.trail), angle_update_interval) == 0: #$ TRAIL AND ANGLE UPDATE
                 proj.angle = np.arctan2(proj.vy, proj.vx)
@@ -225,9 +227,6 @@ class Game(arcade.Window):
                         proj.trail[i] = (proj.trail[i][0], proj.trail[i][1], proj.trail[i][2], proj.trail[i][3] - (fade_rate * delta_time*100))
                 if proj.trail[0][3] <= 0:
                     proj.trail.pop(0)
-            if proj.alive == False:
-                self.projectiles.remove(proj)
-                continue
             if proj.x < 0 or proj.x > self.width or proj.y < 0 or proj.y > self.height:
                 if not proj.lazy:
                     proj.lazy = True
@@ -274,7 +273,6 @@ class Game(arcade.Window):
                         break
                     else: #$ RECCOCHET
                         if np.random.random() < w.Ricochet_Chance:
-                            #TODO: Have to redo this whole thing
                             proj.color = arcade.color.YELLOW
                             if proj.side == -1:
                                 distance_to_midpoint = []
@@ -283,14 +281,17 @@ class Game(arcade.Window):
                                 shortest_distance = distance_to_midpoint.index(min(distance_to_midpoint))
                                 proj.side = shortest_distance
                                 if shortest_distance == 0 or shortest_distance == 2:
-                                    proj.vy = -proj.vy + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
+                                    proj.vy = -proj.vy + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation)
                                 elif shortest_distance == 1 or shortest_distance == 3:
                                     proj.vx = -proj.vx + np.random.randint(-w.Ricochet_Loss_Variation,w.Ricochet_Loss_Variation) - w.Ricochet_Loss
+                                    proj.vy -= w.Ricochet_Loss
+                                    proj.vx -= w.Ricochet_Loss
+                                proj.side = -1
                         else:
                             proj.alive = False
-                    if mx < w.strength:
-                        proj.alive = False
-                        break
+                    # if mx < w.strength:
+                    #     proj.alive = False
+                    #     break
                     break
 
 game = Game()

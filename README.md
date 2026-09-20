@@ -1,4 +1,4 @@
-![Projectile Sim](media/image.png)
+![Projectile Sim](media/cover.png)
 
 # Projectile Sim
 A little project that I made for fun.
@@ -14,3 +14,7 @@ Then I landed on this, a projectile sim with gravity, drag, and also fake heat.
 *No AI was used in this project.*
 
 I'm astonished that we even have to say that.
+
+By messing with the parameters you can get things like this
+
+![variation 1](media/variation%201.png)
